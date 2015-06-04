@@ -391,7 +391,7 @@ class InnerBrowser extends Module implements Web
     {
         $form = $this->getFormFor($frmCrawl);
         $defaults = $this->getFormValuesFor($form);
-        $merged = array_merge($defaults, $params);
+        $merged = array_merge_recursive($defaults, $params);
         $requestParams = $this->setCheckboxBoolValues($frmCrawl, $merged);
 
         if (!empty($button)) {
