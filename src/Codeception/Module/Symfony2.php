@@ -142,6 +142,14 @@ class Symfony2 extends \Codeception\Lib\Framework
         \PHPUnit_Framework_Assert::assertGreaterThan(0, $profile->getCollector('swiftmailer')->getMessageCount());
     }
 
+    public function seeResponseCodeIs($code){
+        \PHPUnit_Framework_Assert::assertEquals($code, $this->getProfiler()->getCollector('request')->getStatusCode());
+    }
+
+    public function seeSMSIsSent(){
+        \PHPUnit_Framework_Assert::assertGreaterThan(0, count($this->getProfiler()->getCollector('sms')->getData()));
+    }
+
     /**
      * Grabs a service from Symfony DIC container.
      * Recommended to use for unit testing.
