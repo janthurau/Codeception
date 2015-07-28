@@ -171,7 +171,7 @@ class Symfony2 extends \Codeception\Lib\Framework
     /**
      * @return \Symfony\Component\HttpKernel\Profiler\Profile
      */
-    protected function getProfiler()
+    public function getProfiler()
     {
         if (!$this->kernel->getContainer()->has('profiler')) return null;
         $profiler = $this->kernel->getContainer()->get('profiler');
