@@ -1,7 +1,7 @@
 <?php
-
 namespace Codeception\Lib\Connector;
 
+use GuzzleHttp\Psr7\Uri;
 use Symfony\Component\BrowserKit\Client;
 use Symfony\Component\BrowserKit\Request;
 use Symfony\Component\BrowserKit\Response;
@@ -10,7 +10,6 @@ use Zend\Http\Headers as HttpHeaders;
 use Zend\Stdlib\Parameters;
 use Zend\Uri\Http as HttpUri;
 use Symfony\Component\BrowserKit\Request as BrowserKitRequest;
-use GuzzleHttp\Url;
 
 class ZF2 extends Client
 {
@@ -40,13 +39,13 @@ class ZF2 extends Client
      */
     public function doRequest($request)
     {
-        $zendRequest  = $this->application->getRequest();
+        $zendRequest = $this->application->getRequest();
         $zendResponse = $this->application->getResponse();
         
         $zendResponse->setStatusCode(200);
         $uri         = new HttpUri($request->getUri());
         $queryString = $uri->getQuery();
-        $method      = strtoupper($request->getMethod());
+        $method = strtoupper($request->getMethod());
 
         $zendRequest->setCookies(new Parameters($request->getCookies()));
 
@@ -95,9 +94,9 @@ class ZF2 extends Client
 
     private function extractHeaders(BrowserKitRequest $request)
     {
-        $headers = array();
+        $headers = [];
         $server = $request->getServer();
-        $uri                 = Url::fromString($request->getUri());
+        $uri                 = new Uri($request->getUri());
         $server['HTTP_HOST'] = $uri->getHost();
         $port                = $uri->getPort();
         if ($port !== null && $port !== 443 && $port != 80) {

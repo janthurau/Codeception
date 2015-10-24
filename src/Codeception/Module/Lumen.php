@@ -5,6 +5,11 @@ use Codeception\Exception\ModuleConfig;
 use Codeception\Lib\Connector\Lumen as LumenConnector;
 use Codeception\Lib\Framework;
 use Codeception\Lib\Interfaces\ActiveRecord;
+use Codeception\Lib\Interfaces\SupportsDomainRouting;
+use Codeception\TestCase;
+use Codeception\Step;
+use Codeception\Configuration;
+use Codeception\Lib\ModuleContainer;
 use Codeception\Subscriber\ErrorHandler;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
@@ -37,7 +42,7 @@ use Illuminate\Support\Facades\Facade;
  * * client - `BrowserKit` client
  *
  */
-class Lumen extends Framework implements ActiveRecord
+class Lumen extends Framework implements ActiveRecord, SupportsDomainRouting
 {
 
     /**
@@ -53,9 +58,10 @@ class Lumen extends Framework implements ActiveRecord
     /**
      * Constructor.
      *
+     * @param ModuleContainer $container
      * @param $config
      */
-    public function __construct($config = null)
+    public function __construct(ModuleContainer $container, $config = null)
     {
         $this->config = array_merge(
             array(
@@ -67,7 +73,7 @@ class Lumen extends Framework implements ActiveRecord
             (array) $config
         );
 
-        parent::__construct();
+        parent::__construct($container);
     }
 
     /**
@@ -84,7 +90,7 @@ class Lumen extends Framework implements ActiveRecord
      * @param \Codeception\TestCase $test
      * @throws ModuleConfig
      */
-    public function _before(\Codeception\TestCase $test)
+    public function _before(TestCase $test)
     {
         $this->initializeLumen();
 
@@ -98,7 +104,7 @@ class Lumen extends Framework implements ActiveRecord
      *
      * @param \Codeception\TestCase $test
      */
-    public function _after(\Codeception\TestCase $test)
+    public function _after(TestCase $test)
     {
         if ($this->app['db'] && $this->config['cleanup']) {
             $this->app['db']->rollback();
@@ -115,7 +121,7 @@ class Lumen extends Framework implements ActiveRecord
      *
      * @param \Codeception\Step $step
      */
-    public function _afterStep(\Codeception\Step $step)
+    public function _afterStep(Step $step)
     {
         Facade::clearResolvedInstances();
     }
@@ -143,7 +149,7 @@ class Lumen extends Framework implements ActiveRecord
      */
     protected function bootApplication()
     {
-        $projectDir = explode($this->config['packages'], \Codeception\Configuration::projectDir())[0];
+        $projectDir = explode($this->config['packages'], Configuration::projectDir())[0];
         $projectDir .= $this->config['root'];
         require $projectDir . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
@@ -151,7 +157,9 @@ class Lumen extends Framework implements ActiveRecord
 
         if (! file_exists($bootstrapFile)) {
             throw new ModuleConfig(
-                $this, "Laravel bootstrap file not found in $bootstrapFile.\nPlease provide a valid path to it using 'bootstrap' config param. "
+                $this,
+                "Laravel bootstrap file not found in $bootstrapFile.\n"
+                . "Please provide a valid path to it using 'bootstrap' config param. "
             );
         }
 
@@ -446,5 +454,4 @@ class Lumen extends Framework implements ActiveRecord
         }
         return $query->first();
     }
-
 }

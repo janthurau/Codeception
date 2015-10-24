@@ -1,10 +1,14 @@
 <?php
 namespace Codeception\Module;
 
-use Codeception\Exception\ModuleConfig;
+use Codeception\Exception\ModuleConfigException;
+use Codeception\Exception\ModuleException;
 use Codeception\Lib\Connector\Laravel5 as LaravelConnector;
 use Codeception\Lib\Framework;
 use Codeception\Lib\Interfaces\ActiveRecord;
+use Codeception\Lib\Interfaces\PartedModule;
+use Codeception\Lib\Interfaces\SupportsDomainRouting;
+use Codeception\Lib\ModuleContainer;
 use Codeception\Subscriber\ErrorHandler;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Facade;
@@ -12,8 +16,8 @@ use Illuminate\Support\Facades\Facade;
 /**
  *
  * This module allows you to run functional tests for Laravel 5.
- * Please try it and leave your feedback.
- * The module is based on the Laravel 4 module by Davert.
+ * It should **not** be used for acceptance tests.
+ * See the Acceptance tests section below for more details.
  *
  * ## Demo project
  * <https://github.com/janhenkgerritsen/codeception-laravel5-sample>
@@ -21,8 +25,14 @@ use Illuminate\Support\Facades\Facade;
  * ## Status
  *
  * * Maintainer: **Jan-Henk Gerritsen**
- * * Stability: **dev**
- * * Contact: janhenkgerritsen@gmail.com
+ * * Stability: **stable**
+ *
+ * ## Example
+ *
+ *     modules:
+ *         enabled:
+ *             - Laravel5:
+ *                 environment_file: .env.testing
  *
  * ## Config
  *
@@ -31,14 +41,33 @@ use Illuminate\Support\Facades\Facade;
  * * bootstrap: `string`, default `bootstrap/app.php` - Relative path to app.php config file.
  * * root: `string`, default `` - Root path of our application.
  * * packages: `string`, default `workbench` - Root path of application packages (if any).
+ * * disable_middleware: `boolean`, default `false` - disable all middleware.
+ * * disable_events: `boolean`, default `false` - disable all events.
  *
  * ## API
  *
  * * app - `Illuminate\Foundation\Application` instance
- * * client - `BrowserKit` client
+ * * client - `\Symfony\Component\BrowserKit\Client` instance
+ *
+ * ## Parts
+ *
+ * * ORM - include only haveRecord/grabRecord/seeRecord/dontSeeRecord actions
+ *
+ * ## Acceptance tests
+ *
+ * You should not use this module for acceptance tests. If you want to use Laravel functionality with your acceptance tests,
+ * for example to do test setup, you can initialize the Laravel functionality by adding the following lines of code to your
+ * suite `_bootstrap.php` file:
+ *
+ *     require 'bootstrap/autoload.php';
+ *     $app = require 'bootstrap/app.php';
+ *     $app->loadEnvironmentFrom('.env.testing');
+ *     $app->instance('request', new \Illuminate\Http\Request);
+ *     $app->make('Illuminate\Contracts\Http\Kernel')->bootstrap();
+ *
  *
  */
-class Laravel5 extends Framework implements ActiveRecord
+class Laravel5 extends Framework implements ActiveRecord, PartedModule, SupportsDomainRouting
 {
 
     /**
@@ -54,18 +83,21 @@ class Laravel5 extends Framework implements ActiveRecord
     /**
      * Constructor.
      *
-     * @param $config
+     * @param ModuleContainer $container
+     * @param array|null $config
      */
-    public function __construct($config = null)
+    public function __construct(ModuleContainer $container, $config = null)
     {
         $this->config = array_merge(
-            array(
+            [
                 'cleanup' => true,
                 'environment_file' => '.env',
                 'bootstrap' => 'bootstrap' . DIRECTORY_SEPARATOR . 'app.php',
                 'root' => '',
                 'packages' => 'workbench',
-            ),
+                'disable_middleware' => false,
+                'disable_events' => false,
+            ],
             (array)$config
         );
 
@@ -75,7 +107,12 @@ class Laravel5 extends Framework implements ActiveRecord
         $this->config['project_dir'] = $projectDir;
         $this->config['bootstrap_file'] = $projectDir . $this->config['bootstrap'];
 
-        parent::__construct();
+        parent::__construct($container);
+    }
+
+    public function _parts()
+    {
+        return ['orm'];
     }
 
     /**
@@ -93,7 +130,6 @@ class Laravel5 extends Framework implements ActiveRecord
      * Before hook.
      *
      * @param \Codeception\TestCase $test
-     * @throws ModuleConfig
      */
     public function _before(\Codeception\TestCase $test)
     {
@@ -109,6 +145,8 @@ class Laravel5 extends Framework implements ActiveRecord
             // Destroy existing sessions of previous tests
             $this->app['session']->migrate(true);
         }
+
+        $this->client->clearExpectedEvents();
     }
 
     /**
@@ -120,6 +158,10 @@ class Laravel5 extends Framework implements ActiveRecord
     {
         if ($this->app['db'] && $this->config['cleanup']) {
             $this->app['db']->rollback();
+        }
+
+        if ($missedEvents = $this->client->missedEvents()) {
+            $test->fail('The following events did not fire: ' . implode(',', $missedEvents));
         }
     }
 
@@ -145,7 +187,7 @@ class Laravel5 extends Framework implements ActiveRecord
         $bootstrapFile = $this->config['bootstrap_file'];
 
         if (!file_exists($bootstrapFile)) {
-            throw new ModuleConfig(
+            throw new ModuleConfigException(
                 $this,
                 "Laravel bootstrap file not found in $bootstrapFile.\nPlease provide a valid path to it using 'bootstrap' config param. "
             );
@@ -161,6 +203,8 @@ class Laravel5 extends Framework implements ActiveRecord
 
         \Illuminate\Support\ClassLoader::register();
     }
+
+
 
     /**
      * Revert back to the Codeception error handler,
@@ -191,6 +235,83 @@ class Laravel5 extends Framework implements ActiveRecord
     }
 
     /**
+     * Disable middleware for the next requests.
+     *
+     * ``` php
+     * <?php
+     * $I->disableMiddleware();
+     * ?>
+     * ```
+     */
+    public function disableMiddleware()
+    {
+        $this->config['disable_middleware'] = true;
+    }
+
+    /**
+     * Enable middleware for the next requests.
+     *
+     * ``` php
+     * <?php
+     * $I->enableMiddleware();
+     * ?>
+     * ```
+     */
+    public function enableMiddleware()
+    {
+        $this->config['disable_middleware'] = false;
+    }
+
+    /**
+     * Disable events for the next requests.
+     *
+     * ``` php
+     * <?php
+     * $I->disableEvents();
+     * ?>
+     * ```
+     */
+    public function disableEvents()
+    {
+        $this->config['disable_events'] = true;
+    }
+
+    /**
+     * Enable events for the next requests.
+     *
+     * ``` php
+     * <?php
+     * $I->enableEvents();
+     * ?>
+     * ```
+     */
+    public function enableEvents()
+    {
+        $this->config['disable_events'] = false;
+    }
+
+    /**
+     * Make sure events fired during the test.
+     *
+     * ``` php
+     * <?php
+     * $I->expectEvents('App\MyEvent');
+     * $I->expectEvents('App\MyEvent', 'App\MyOtherEvent');
+     * $I->expectEvents(['App\MyEvent', 'App\MyOtherEvent']);
+     * ?>
+     * ```
+     * @param $events
+     */
+    public function expectEvents($events)
+    {
+        $events = is_array($events) ? $events : func_get_args();
+
+        foreach ($events as $expectedEvent) {
+            $this->client->addExpectedEvent($expectedEvent);
+        }
+    }
+
+    /**
      * Opens web page using route name and parameters.
      *
      * ``` php
@@ -204,15 +325,32 @@ class Laravel5 extends Framework implements ActiveRecord
      */
     public function amOnRoute($routeName, $params = [])
     {
-        $route = $this->app['routes']->getByName($routeName);
-
-        if (!$route) {
-            $this->fail("Route with name '$routeName' does not exist");
-        }
+        $route = $this->getRouteByName($routeName);
 
         $absolute = !is_null($route->domain());
         $url = $this->app['url']->route($routeName, $params, $absolute);
         $this->amOnPage($url);
+    }
+
+    /**
+     * Checks that current url matches route
+     *
+     * ``` php
+     * <?php
+     * $I->seeCurrentRouteIs('posts.index');
+     * ?>
+     * ```
+     * @param $route
+     */
+    public function seeCurrentRouteIs($route)
+    {
+        $this->getRouteByName($route); // Fails if route does not exists
+        $currentRoute = $this->app->request->route()->getName();
+
+        if ($currentRoute != $route) {
+            $message = is_null($currentRoute) ? "Current route has no name" : "Current route is \"$currentRoute\"";
+            $this->fail($message);
+        }
     }
 
     /**
@@ -229,16 +367,61 @@ class Laravel5 extends Framework implements ActiveRecord
      */
     public function amOnAction($action, $params = [])
     {
-        $namespacedAction = $this->actionWithNamespace($action);
-        $route = $this->app['routes']->getByAction($namespacedAction);
-
-        if (!$route) {
-            $this->fail("Action '$action' does not exists");
-        }
-
+        $route = $this->getRouteByAction($action);
         $absolute = !is_null($route->domain());
         $url = $this->app['url']->action($action, $params, $absolute);
+
         $this->amOnPage($url);
+    }
+
+    /**
+     * Checks that current url matches action
+     *
+     * ``` php
+     * <?php
+     * $I->seeCurrentActionIs('PostsController@index');
+     * ?>
+     * ```
+     *
+     * @param $action
+     */
+    public function seeCurrentActionIs($action)
+    {
+        $this->getRouteByAction($action); // Fails if route does not exists
+        $currentAction = $this->app->request->route()->getActionName();
+        $currentAction = ltrim(str_replace($this->getRootControllerNamespace(), "", $currentAction), '\\');
+
+        if ($currentAction != $action) {
+            $this->fail("Current action is \"$currentAction\"");
+        }
+    }
+
+    /**
+     * @param $routeName
+     * @return mixed
+     */
+    protected function getRouteByName($routeName)
+    {
+        if (!$route = $this->app['routes']->getByName($routeName)) {
+            $this->fail("Route with name '$routeName' does not exist");
+        }
+
+        return $route;
+    }
+
+    /**
+     * @param string $action
+     * @return \Illuminate\Routing\Route
+     */
+    protected function getRouteByAction($action)
+    {
+        $namespacedAction = $this->actionWithNamespace($action);
+
+        if (!$route = $this->app['routes']->getByAction($namespacedAction)) {
+            $this->fail("Action '$action' does not exist");
+        }
+
+        return $route;
     }
 
     /**
@@ -275,39 +458,6 @@ class Laravel5 extends Framework implements ActiveRecord
     }
 
     /**
-     * Checks that current url matches route
-     *
-     * ``` php
-     * <?php
-     * $I->seeCurrentRouteIs('posts.index');
-     * ?>
-     * ```
-     * @param $route
-     * @param array $params
-     */
-    public function seeCurrentRouteIs($route, $params = array())
-    {
-        $this->seeCurrentUrlEquals($this->app['url']->route($route, $params, false));
-    }
-
-    /**
-     * Checks that current url matches action
-     *
-     * ``` php
-     * <?php
-     * $I->seeCurrentActionIs('PostsController@index');
-     * ?>
-     * ```
-     *
-     * @param $action
-     * @param array $params
-     */
-    public function seeCurrentActionIs($action, $params = array())
-    {
-        $this->seeCurrentUrlEquals($this->app['url']->action($action, $params, false));
-    }
-
-    /**
      * Assert that a session variable exists.
      *
      * ``` php
@@ -318,20 +468,21 @@ class Laravel5 extends Framework implements ActiveRecord
      * ```
      *
      * @param  string|array $key
-     * @param  mixed $value
+     * @param  mixed|null $value
      * @return void
      */
     public function seeInSession($key, $value = null)
     {
         if (is_array($key)) {
             $this->seeSessionHasValues($key);
-
             return;
         }
 
-        if (is_null($value)) {
-            $this->assertTrue($this->app['session']->has($key));
-        } else {
+        if (! $this->app['session']->has($key)) {
+            $this->fail("No session variable with key '$key'");
+        }
+
+        if (! is_null($value)) {
             $this->assertEquals($value, $this->app['session']->get($key));
         }
     }
@@ -374,20 +525,41 @@ class Laravel5 extends Framework implements ActiveRecord
     public function seeFormHasErrors()
     {
         $viewErrorBag = $this->app->make('view')->shared('errors');
-        $this->assertTrue(count($viewErrorBag) > 0);
+        if (count($viewErrorBag) == 0) {
+            $this->fail("There are no form errors");
+        }
+    }
+
+    /**
+     * Assert that there are no form errors bound to the View.
+     *
+     * ``` php
+     * <?php
+     * $I->dontSeeFormErrors();
+     * ?>
+     * ```
+     *
+     * @return bool
+     */
+    public function dontSeeFormErrors()
+    {
+        $viewErrorBag = $this->app->make('view')->shared('errors');
+        if (count($viewErrorBag) > 0) {
+            $this->fail("Found the following form errors: \n\n" . $viewErrorBag->toJson(JSON_PRETTY_PRINT));
+        }
     }
 
     /**
      * Assert that specific form error messages are set in the view.
      *
-     * Useful for validation messages e.g.
-     *  return `Redirect::to('register')->withErrors($validator);`
-     *
-     * Example of Usage
+     * This method calls `seeFormErrorMessage` for each entry in the `$bindings` array.
      *
      * ``` php
      * <?php
-     * $I->seeFormErrorMessages(array('username'=>'Invalid Username'));
+     * $I->seeFormErrorMessages([
+     *     'username' => 'Invalid Username',
+     *     'password' => null,
+     * ]);
      * ?>
      * ```
      * @param array $bindings
@@ -400,27 +572,34 @@ class Laravel5 extends Framework implements ActiveRecord
     }
 
     /**
-     * Assert that specific form error message is set in the view.
+     * Assert that a specific form error message is set in the view.
      *
-     * Useful for validation messages and generally messages array
-     *  e.g.
-     *  return `Redirect::to('register')->withErrors($validator);`
+     * If you want to assert that there is a form error message for a specific key
+     * but don't care about the actual error message you can omit `$expectedErrorMessage`.
      *
-     * Example of Usage
+     * If you do pass `$expectedErrorMessage`, this method checks if the actual error message for a key
+     * contains `$expectedErrorMessage`.
      *
      * ``` php
      * <?php
+     * $I->seeFormErrorMessage('username');
      * $I->seeFormErrorMessage('username', 'Invalid Username');
      * ?>
      * ```
      * @param string $key
-     * @param string $errorMessage
+     * @param string|null $expectedErrorMessage
      */
-    public function seeFormErrorMessage($key, $errorMessage)
+    public function seeFormErrorMessage($key, $expectedErrorMessage = null)
     {
         $viewErrorBag = $this->app['view']->shared('errors');
 
-        $this->assertEquals($errorMessage, $viewErrorBag->first($key));
+        if (!($viewErrorBag->has($key))) {
+            $this->fail("No form error message for key '$key'\n");
+        }
+
+        if (! is_null($expectedErrorMessage)) {
+            $this->assertContains($expectedErrorMessage, $viewErrorBag->first($key));
+        }
     }
 
     /**
@@ -428,21 +607,34 @@ class Laravel5 extends Framework implements ActiveRecord
      * Takes either an object that implements the User interface or
      * an array of credentials.
      *
+     * ``` php
+     * <?php
+     * // provide array of credentials
+     * $I->amLoggedAs(['username' => 'jane@example.com', 'password' => 'password']);
+     *
+     * // provide User object
+     * $I->amLoggesAs( new User );
+     *
+     * // can be verified with $I->seeAuthentication();
+     * ?>
+     * ```
      * @param  \Illuminate\Contracts\Auth\User|array $user
-     * @param  string $driver
+     * @param  string|null $driver 'eloquent', 'database', or custom driver
      * @return void
      */
     public function amLoggedAs($user, $driver = null)
     {
         if ($user instanceof Authenticatable) {
-            $this->app['auth']->driver($driver)->setUser($user);
-        } else {
-            $this->app['auth']->driver($driver)->attempt($user);
+            return $this->app['auth']->driver($driver)->setUser($user);
+        }
+
+        if (! $this->app['auth']->driver($driver)->attempt($user)) {
+            $this->fail("Failed to login with credentials " . json_encode($user));
         }
     }
 
     /**
-     * Logs user out
+     * Logout user.
      */
     public function logout()
     {
@@ -450,11 +642,13 @@ class Laravel5 extends Framework implements ActiveRecord
     }
 
     /**
-     * Checks that user is authenticated
+     * Checks that a user is authenticated
      */
     public function seeAuthentication()
     {
-        $this->assertTrue($this->app['auth']->check(), 'User is not logged in');
+        if (! $this->app['auth']->check()) {
+            $this->fail("There is no authenticated user");
+        }
     }
 
     /**
@@ -462,14 +656,15 @@ class Laravel5 extends Framework implements ActiveRecord
      */
     public function dontSeeAuthentication()
     {
-        $this->assertFalse($this->app['auth']->check(), 'User is logged in');
+        if ($this->app['auth']->check()) {
+            $this->fail("There is an authenticated user");
+        }
     }
 
     /**
      * Return an instance of a class from the IoC Container.
      * (http://laravel.com/docs/ioc)
      *
-     * Example
      * ``` php
      * <?php
      * // In Laravel
@@ -505,15 +700,15 @@ class Laravel5 extends Framework implements ActiveRecord
      * @param $tableName
      * @param array $attributes
      * @return mixed
+     * @part orm
      */
-    public function haveRecord($tableName, $attributes = array())
+    public function haveRecord($tableName, $attributes = [])
     {
-        $id = $this->app['db']->table($tableName)->insertGetId($attributes);
-        if (!$id) {
-            $this->fail("Couldn't insert record into table $tableName");
+        try {
+            return $this->app['db']->table($tableName)->insertGetId($attributes);
+        } catch (\Exception $e) {
+            $this->fail("Could not insert record into table '$tableName':\n\n" . $e->getMessage());
         }
-
-        return $id;
     }
 
     /**
@@ -527,14 +722,13 @@ class Laravel5 extends Framework implements ActiveRecord
      *
      * @param $tableName
      * @param array $attributes
+     * @part orm
      */
-    public function seeRecord($tableName, $attributes = array())
+    public function seeRecord($tableName, $attributes = [])
     {
-        $record = $this->findRecord($tableName, $attributes);
-        if (!$record) {
-            $this->fail("Couldn't find $tableName with " . json_encode($attributes));
+        if (! $this->findRecord($tableName, $attributes)) {
+            $this->fail("Could not find matching record in table '$tableName'");
         }
-        $this->debugSection($tableName, json_encode($record));
     }
 
     /**
@@ -548,13 +742,12 @@ class Laravel5 extends Framework implements ActiveRecord
      *
      * @param $tableName
      * @param array $attributes
+     * @part orm
      */
-    public function dontSeeRecord($tableName, $attributes = array())
+    public function dontSeeRecord($tableName, $attributes = [])
     {
-        $record = $this->findRecord($tableName, $attributes);
-        $this->debugSection($tableName, json_encode($record));
-        if ($record) {
-            $this->fail("Unexpectedly managed to find $tableName with " . json_encode($attributes));
+        if ($this->findRecord($tableName, $attributes)) {
+            $this->fail("Unexpectedly found matching record in table '$tableName'");
         }
     }
 
@@ -570,10 +763,15 @@ class Laravel5 extends Framework implements ActiveRecord
      * @param $tableName
      * @param array $attributes
      * @return mixed
+     * @part orm
      */
-    public function grabRecord($tableName, $attributes = array())
+    public function grabRecord($tableName, $attributes = [])
     {
-        return $this->findRecord($tableName, $attributes);
+        if (! $record = $this->findRecord($tableName, $attributes)) {
+            $this->fail("Could not find matching record in table '$tableName'");
+        }
+
+        return $record;
     }
 
     /**
@@ -581,7 +779,7 @@ class Laravel5 extends Framework implements ActiveRecord
      * @param array $attributes
      * @return mixed
      */
-    protected function findRecord($tableName, $attributes = array())
+    protected function findRecord($tableName, $attributes = [])
     {
         $query = $this->app['db']->table($tableName);
         foreach ($attributes as $key => $value) {
@@ -591,4 +789,103 @@ class Laravel5 extends Framework implements ActiveRecord
         return $query->first();
     }
 
+    /**
+     * Use Laravel's model factory to create a model.
+     * Can only be used with Laravel 5.1 and later.
+     *
+     * ``` php
+     * <?php
+     * $I->haveModel('App\User');
+     * $I->haveModel('App\User', ['name' => 'John Doe']);
+     * $I->haveModel('App\User', [], 'admin');
+     * $I->haveModel('App\User', [], 'admin', 3);
+     * ?>
+     * ```
+     *
+     * @see http://laravel.com/docs/5.1/testing#model-factories
+     * @param string $model
+     * @param array $attributes
+     * @param string $name
+     * @param int $times
+     * @return mixed
+     */
+    public function haveModel($model, $attributes = [], $name = 'default', $times = 1)
+    {
+        return $this->createModel($model, $attributes, $name, $times);
+    }
+
+    /**
+     * Use Laravel's model factory to create a model.
+     * Can only be used with Laravel 5.1 and later.
+     *
+     * ``` php
+     * <?php
+     * $I->createModel('App\User');
+     * $I->createModel('App\User', ['name' => 'John Doe']);
+     * $I->createModel('App\User', [], 'admin');
+     * $I->createModel('App\User', [], 'admin', 3);
+     * ?>
+     * ```
+     *
+     * @see http://laravel.com/docs/5.1/testing#model-factories
+     * @param string $model
+     * @param array $attributes
+     * @param string $name
+     * @param int $times
+     * @return mixed
+     */
+    public function createModel($model, $attributes = [], $name = 'default', $times = 1)
+    {
+        try {
+            return $this->modelFactory($model, $name, $times)->create($attributes);
+        } catch(\Exception $e) {
+            $this->fail("Could not create model: \n\n" . get_class($e) . "\n\n" . $e->getMessage());
+        }
+    }
+
+    /**
+     * Use Laravel's model factory to make a model.
+     * Can only be used with Laravel 5.1 and later.
+     *
+     * ``` php
+     * <?php
+     * $I->makeModel('App\User');
+     * $I->makeModel('App\User', ['name' => 'John Doe']);
+     * $I->makeModel('App\User', [], 'admin');
+     * $I->makeModel('App\User', [], 'admin', 3);
+     * ?>
+     * ```
+     *
+     * @see http://laravel.com/docs/5.1/testing#model-factories
+     * @param string $model
+     * @param array $attributes
+     * @param string $name
+     * @param int $times
+     * @return mixed
+     */
+    public function makeModel($model, $attributes = [], $name = 'default', $times = 1)
+    {
+        try {
+            return $this->modelFactory($model, $name, $times)->make($attributes);
+        } catch(\Exception $e) {
+            $this->fail("Could not make model: \n\n" . get_class($e) . "\n\n" . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param string $model
+     * @param string $name
+     * @param int $times
+     * @return \Illuminate\Database\Eloquent\FactoryBuilder
+     * @throws ModuleException
+     */
+    protected function modelFactory($model, $name, $times)
+    {
+        if (! function_exists('factory')) {
+            throw new ModuleException($this, 'The factory() method does not exist. ' .
+                'This functionality relies on Laravel model factories, which were introduced in Laravel 5.1.');
+        }
+
+        return factory($model, $name, $times);
+    }
 }

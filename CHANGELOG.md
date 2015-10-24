@@ -1,13 +1,117 @@
 # Changelog
 
-#### 2.0.17
+#### 2.1.4
+
+* [PhpBrowser][Frameworks] Added moveBack method. By @Naktibalda
+* [Laravel5] Improved the error messages for several methods. See #2476. By @janhenkgerritsen
+* [Laravel5] Improved form error methods. See #2432. By @janhenkgerritsen
+* [Laravel5] Added wrapper methods for Laravel 5 model factories. See #2442. By @janhenkgerritsen
+
+#### 2.1.3
+
+* [REST] **Added matching data types** by with new methods `seeResponseMatchesJsonType` and `dontSeeResponseMatchesJsonType`. See #2391
+* [PhpBrowser][Frameworks] added `_request` and `_loadPage` hidden API methods for performing arbitrary requests.
+* [PhpBrowser][Frameworks] Fixed `seeInField`, `dontSeeInField` for disabled fields #2378. See #2414.
+* Environment files can now be located in subfolders of `tests/_env` by @Zifius
+* [Symfony2] Fixed issue when accessing profiler when no request has been performed #652.
+* [Symfony2] Added `amOnRoute` and `seeCurrentRouteIs` methods  by @raistlin
+* [ZF2] Added `amOnRoute` and `seeCurrentRouteIs` methods module, by @Naktibalda
+* Fixed issue with trailing slashes in `seeCurrentUrlEquals` and `dontSeeCurrentUrlEquals` methods #2324. By @janhenkgerritsen
+* Warning is displayed once using unconfigured environment.
+* Fixed loading environment configurations for Cept files by @splinter89
+* Fixed bootstrap with namespaces to inject namespaced actor classes properly.
+* [PhpBrowser][Frameworks] added hidden `_request()` method to send requests to backend from Helper classes.
+* [Laravel5] Added `disableEvents()`, `enableEvents()` and `expectEvents()` methods. By @janhenkgerritsen
+* [Laravel5] Added `dontSeeFormErrors()` method. By @janhenkgerritsen
+* [Db] Deleted Oracle driver (it existed by mistake, the real driver is Oci). By @Naktibalda
+* [Db] Implemented getPrimaryKey method for Sqlite, Mysql, Postgresql, Oracle and MsSql. By @Naktibalda
+* [Db] Implemented support for composite primary keys and tables without primary keys. By @Naktibalda
+* Fixed the scalarizeArray to be aware of NULL fields #2264. By @fbidu
+* [Soap] Fixed SOAP module #2296. By @relaxart
+* Fixed a bug where blank lines in a groups file would run every test in the project #2297. By @imjoehaines
+* [WebDriver] seeNumberOfElements should only count visible elements #2303. By @sascha-egerer
+* [PhpBrowser][Frameworks] Verbose output for all HTTP requests. By @Naktibalda
+* [PhpBrowser][Frameworks] Throw `Codeception\Exception\ExternalUrlException` when framework module tries to open an external URL #2328. By @Naktibalda
+* [PhpBrowser][Frameworks] Added `switchToIframe` method. By @Naktibalda
+* [Dbh] module deprecated
+
+#### 2.1.2
+
+* **Updated to PHPUnit 4.8**
+* Enhancement: **Wildcard includes enabled when testing [multiple applications](http://codeception.com/docs/08-Customization#One-Runner-for-Multiple-Applications)**. See #2016 By @nzod
+* [Symfony2] fixed Doctrine2 integration: Doctrine transactions will start before each test and rollback afterwards. *2015-08-08*
+* [Doctrine2] establishing connection and starting transaction is moved to `_before`. *2015-08-08*
+* [PhpBrowser] Removed disabled and file fields from form values. By @Naktibalda *2015-08-08*
+* [ZF2] Added grabServiceFromContainer function. By InVeX  *2015-08-08*
+* [PhpBrowser][Guzzle6] Disabled strict mode of CookieJar #2234 By @Naktibalda *2015-08-04*
+* [Laravel5] Added `disableMiddleware()` and `enableMiddleware()` methods. By @janhenkgerritsen *2015-08-07*
+* Enhancement: If a specific *ActorActions trait does not exist in `tests/_support/_generated` directory, it will be created automatically before run.
+* Enhancement: do not execute all included suites if you run one specific suite *2015-08-08*
+* `Extension\Recorder` navigate over slides with left and right arrow keys, do not create screenshots for comment steps.
+* `Extension\Recorder` generates index html for all saved records.
+* `Extension\Recorder` fixed for creating directories twice. Fixed #2216
+* `Extension\Logger` fixed #2216
+* Fixed injection of Helpers into Cest and Test files. See #2222
+* `Stub::makeEmpty` on interfaces works again by @Naktibalda
+* Command `generate:scenarios` fixed for Cest files by @mkudenko See #1962
+* [Db] Quoted table name in Db::select, removed identical methods from child classes by @Naktibalda. See #2231
+* [WebDriver] added support for running tests on a remote server behind a proxy with `http_proxy` and `http_proxy_port` config options by @jdq22 *2015-07-29*
+* [Laravel] Fixed issue with error handling for `haveRecord()` method in Laravel modules #2217 by @janhenkgerritsen *2015-07-28*
+* Fixed displayed XML/HTML report path #2187 by @Naktibalda *2015-07-27*
+* [WebDriver] Fixed `waitForElementChange` fatal error by @stipsan
+* [Db] Enhanced dollar quoting ($$) processing in PostgreSQL driver by @YasserHassan *2015-07-20*
+* [REST] Created tests for file-upload with REST module. By @Naktibalda *2015-08-08*
 * [Lumen] Fixed issue where wrong request object was passed to the Lumen application by @janhenkgerritsen *2015-07-18*
 
-#### 2.0.16
+#### 2.1.1
 
-* [REST] Module usage should not depend on order it was declared. Fixes #2100 by @Naktibalda
-* [Db] When `populate` is enabled cleanup should happen only if `cleanup` enabled too #2148 by @gammamatrix
-* [Laravel5] Rewrite of module to fix open issues and other problems *2015-07-09*
+* [WebDriver] **Upgraded to facebook/webdriver 1.0** *2015-07-11*
+  WebDriver classes were moved to `Facebook\WebDriver` namespace. Please take that into account when using WebDriver API directly.
+  Till 2.2 Codeception will keep non-namespaced aliases of WebDriver classes.
+* Module Reference now contains documentation for hidden API methods which should be used in Helper classes
+* Skipped and Incomplete tests won't fire `test.before` and `test.after` events. For instance, WebDriver browser won't be started and Db cleanups won't be executed on incomplete or skipped tests.
+* Annotations `skip` and `incomplete` enabled in Cest files #2131
+* [WebDriver][PhpBrowser][Frameworks] `_findElements($locator)` method added to use in Helper classes *2015-07-11*
+  Now you can use `$this->getModule('WebDriver')->findElements('.user');` in Helpers to match all elements with `user` class using WebDriver module
+* [PhpBrowser] Fixed `amOnUrl` method to open absolute URLs.
+* [PhpBrowser][Frameworks] Fix for `fillField` using values that contain ampersands by @GawainLynch and @zbateson Issue #2132
+* [WebDriver][PhpBrowser][Frameworks] Fixed missing HTTPS when trying to access protected pages #2141
+
+#### 2.1.0
+
+* [Recorder](https://github.com/Codeception/Codeception/tree/master/ext#codeceptionextensionrecorder) extension added. Shows acceptance test progress with a recorded slideshow.
+* **Updated to Guzzle 6**. Codeception can now work both with Guzzle v5 and Guzzle v6. PhpBrowser chooses right connector depending on Guzzle version installed. By @davertmik and @enumag
+* Annotations in Cept files.
+  Instead of calling `$scenario->skip()`, `$scenario->group('firefox')`, etc, it is recommended to set scenario metadata with annotations `// @skip`, `// @group firefox`.
+  Annotations can be parsed from line or block comments. `$scenario->skip()` and `$scenario->incomplete()` are still valid and can be executed inside conditional statements:
+  ```
+  if (!extension_loaded('xdebug')) $scenario->skip('Xdebug required')
+  ```
+* **PSR-4**: all support classes moved to `tests/_support` by default. Actors, Helpers, PageObjects, StepObjects, GroupObjects to follow PSR-4 naming style. Autoloader implemented by @splinter89.
+* **Dependency Injection**: support classes can be injected into tests. Support classes can be injected into each other too. This happens by implementing method `_inject` and explicitly specifying class names as parameters. Implemented by @splinter89.
+* **Actor classes can be extended**, their generated parts were moved to special traits in `_generated` namespace. Each *Tester class can be updated with custom methods.
+* **Module config simplified**: Modules can be configured in `enabled` section of suite config.
+* **Conflicts**: module can define conflicts with each other by implementing `_conflicts` method
+* **Dependencies**: module can explicitly define dependencies and expect their injection by implementing `_inject` and `_depends` methods and relying on dependency injection container.
+* **Current** modules, environment, and test name can be received in scenario. Example: `$scenario->current('env')` returns current environment name. Fixes #1251
+* **Environment Matrix**: environments can be merged. Environment configs can be created in `tests/_envs`, environment generator added. Implemented by By @sjableka. See #1747
+* **Custom Printers**: XML, JSON, TAP, Report printers can be redefined in configuration. See #1425
+* [Db] Added `reconnect` option for long running tests, which will connect to database before the test and disconnect after. By @Naktibalda
+* Module parts. Actions of modules can be loaded partially in order to disable actions which are not used in current tests. For instance, disable web actions of framework modules in unit testsing.
+* **Kohana**, **Symfony1**, **Doctrine1** modules considered deprecated and moved to standalone packages.
+* `shuffle` added to settings. Randomizes order of running tests. See #1504
+* Console output improved: scenario stack traces contain files and lines of fail.
+* [Doctrine2][Symfony2] `symfony_em_service` config option moved from Doctrine2 to Symfony2 module and renamed to `em_service` *2015-06-03*
+* [PhpBrowser][Frameworks] Fixed cloning form nodes `Codeception\Lib\InnerBrowser::getFormFromCrawler(): ID XXX already defined` *2015-05-13*
+* [WebDriver] session snapshot implemented, allows to store cookies and load them, i.e., to keep user session between testss.
+* [WebDriver][PhpBrowser][Frameworks] Malformed XPath locators wil throw an exception #1441
+* `MODULE_INIT` event is fired before initializing modules #1370
+* Graceful tests termination using `pcntl_signal`. See #1286
+* Group classes renamed to GroupObjects; Base GroupObject class renamed to `Codeception\GroupObject`
+* Official extensions moved to `ext` dir; Base Extension class renamed to `Codeception\Extension`
+* Duplicate environment options won't cause Codeception to run environment tests twice
+* [Phalcon1] `haveServiceInDi` method implemented by @sergeyklay
+* [Db] `seeNumRecords` method added by @sergeyklay
 
 #### 2.0.15
 
@@ -116,6 +220,11 @@ Modifications to ensure multiple values get sent correctly.
 * [Dbh] Begin transaction only unless transaction is already in progress by @thecatontheflat *2015-02-23*
 * [PhpBrowser][Frameworks] Fix quiet crash when crawler is null by @aivus. See #1714 *2015-02-23*
 * [Yii2] Fixed usage of PUT method by @miroslav-chandler *2015-02-23*
+
+
+#### 2.1.0
+
+* [WebDriver] Saving and restoring session snapshots implemented *2015-03-16*
 
 
 #### 2.0.10

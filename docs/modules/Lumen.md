@@ -1,6 +1,4 @@
-# Lumen Module
 
-**For additional reference, please review the [source](https://github.com/Codeception/Codeception/tree/2.0/src/Codeception/Module/Lumen.php)**
 
 
 
@@ -30,6 +28,102 @@ Please try it and leave your feedback.
 
 
 
+### _findElements
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Locates element using available Codeception locator types:
+
+* XPath
+* CSS
+* Strict Locator
+
+Use it in Helpers or GroupObject or Extension classes:
+
+```php
+<?php
+$els = $this->getModule('Lumen')->_findElements('.items');
+$els = $this->getModule('Lumen')->_findElements(['name' => 'username']);
+
+$editLinks = $this->getModule('Lumen')->_findElements(['link' => 'Edit']);
+// now you can iterate over $editLinks and check that all them have valid hrefs
+```
+
+WebDriver module returns `Facebook\WebDriver\Remote\RemoteWebElement` instances
+PhpBrowser and Framework modules return `Symfony\Component\DomCrawler\Crawler` instances
+
+ * `param` $locator
+ * `return` array of interactive elements
+
+
+### _loadPage
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Opens a page with arbitrary request parameters.
+Useful for testing multi-step forms on a specific step.
+
+```php
+<?php
+// in Helper class
+public function openCheckoutFormStep2($orderId) {
+    $this->getModule('Lumen')->_loadPage('POST', '/checkout/step2', ['order' => $orderId]);
+}
+?>
+```
+
+ * `param` $method
+ * `param` $uri
+ * `param array` $parameters
+ * `param array` $files
+ * `param array` $server
+ * `param null` $content
+
+
+### _request
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Send custom request to a backend using method, uri, parameters, etc.
+Use it in Helpers to create special request actions, like accessing API
+Returns a string with response body.
+
+```php
+<?php
+// in Helper class
+public function createUserByApi($name) {
+    $userData = $this->getModule('Lumen')->_request('POST', '/api/v1/users', ['name' => $name]);
+    $user = json_decode($userData);
+    return $user->id;
+}
+?>
+```
+Does not load the response into the module so you can't interact with response page (click, fill forms).
+To load arbitrary page for interaction, use `_loadPage` method.
+
+ * `param` $method
+ * `param` $uri
+ * `param array` $parameters
+ * `param array` $files
+ * `param array` $server
+ * `param null` $content
+@return mixed|Crawler
+@throws ExternalUrlException
+@see `_loadPage`
+
+
+### _savePageSource
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Saves page source of to a file
+
+```php
+$this->getModule('Lumen')->_savePageSource(codecept_output_dir().'page.html');
+```
+ * `param` $filename
+
+
 ### amHttpAuthenticated
  
 Authenticates user for HTTP_AUTH
@@ -46,7 +140,7 @@ an array of credentials.
 
  * `param`  \Illuminate\Contracts\Auth\User|array $user
  * `param`  string $driver
-@return void
+ * `return` void
 
 
 ### amOnPage
@@ -381,7 +475,7 @@ $I->fillField(['name' => 'email'], 'jon@mail.com');
  
 Provides access the Lumen application object.
 
-@return \Laravel\Lumen\Application
+ * `return` \Laravel\Lumen\Application
 
 
 ### grabAttributeFrom
@@ -426,6 +520,32 @@ $uri = $I->grabFromCurrentUrl();
  * `param null` $uri
 
  * `internal param` $url
+
+
+### grabMultiple
+ 
+Grabs either the text content, or attribute values, of nodes
+matched by $cssOrXpath and returns them as an array.
+
+```html
+<a href="#first">First</a>
+<a href="#second">Second</a>
+<a href="#third">Third</a>
+```
+
+```php
+<?php
+// would return ['First', 'Second', 'Third']
+$aLinkText = $I->grabMultiple('a');
+
+// would return ['#first', '#second', '#third']
+$aLinks = $I->grabMultiple('a', 'href');
+?>
+```
+
+ * `param` $cssOrXpath
+ * `param` $attribute
+ * `return` string[]
 
 
 ### grabRecord
@@ -486,7 +606,7 @@ $value = $I->grabTextFrom('~<input value=(.*?)]~sgi'); // match with a regex
  
  * `param` $field
 
-@return array|mixed|null|string
+ * `return` array|mixed|null|string
 
 
 ### haveRecord
@@ -639,7 +759,7 @@ $I->seeInCurrentUrl('/users/');
 
 ### seeInField
  
-Checks that the given input field or textarea contains the given value. 
+Checks that the given input field or textarea contains the given value.
 For fuzzy locators, fields are matched by label text, the "name" attribute, CSS, and XPath.
 
 ``` php
@@ -726,7 +846,7 @@ Assert that the session has a given list of values.
 
  * `param`  string|array $key
  * `param`  mixed $value
-@return void
+ * `return` void
 
 
 ### seeInTitle
@@ -770,9 +890,9 @@ $I->seeNumberOfElements('tr', [0,10]); //between 0 and 10 elements
 ?>
 ```
  * `param` $selector
- * `param mixed` $expected:
+ * `param mixed` $expected :
 - string: strict number
-- array: range of numbers [0,10]  
+- array: range of numbers [0,10]
 
 
 ### seeOptionIsSelected
@@ -820,7 +940,7 @@ Checks that response code is equal to value provided.
 Assert that the session has a given list of values.
 
  * `param`  array $bindings
-@return void
+ * `return` void
 
 
 ### selectOption
@@ -914,8 +1034,6 @@ $I->setCookie('PHPSESSID', 'el4ukv0kqbvoirg7nkp4dncpk3');
  * `param` $name
  * `param` $val
  * `param array` $params
- * `internal param` $cookie
- * `internal param` $value
 
 
 
@@ -957,7 +1075,7 @@ For example, given this sample "Sign Up" form:
     <input type="text" name="user[login]" /><br/>
     Password:
     <input type="password" name="user[password]" /><br/>
-    Do you agree to out terms?
+    Do you agree to our terms?
     <input type="checkbox" name="user[agree]" /><br/>
     Select pricing plan:
     <select name="plan">
@@ -1077,6 +1195,24 @@ $I->submitForm('#my-form', [
  * `param` $button
 
 
+### switchToIframe
+ 
+Switch to iframe or frame on the page.
+
+Example:
+``` html
+<iframe name="another_frame" src="http://example.com">
+```
+
+``` php
+<?php
+# switch to iframe
+$I->switchToIframe("another_frame");
+```
+
+ * `param string` $name
+
+
 ### uncheckOption
  
 Unticks a checkbox.
@@ -1089,4 +1225,4 @@ $I->uncheckOption('#notify');
 
  * `param` $option
 
-<p>&nbsp;</p><div class="alert alert-warning">Module reference is taken from the source code. <a href="https://github.com/Codeception/Codeception/tree/2.0/src/Codeception/Module/Lumen.php">Help us to improve documentation. Edit module reference</a></div>
+<p>&nbsp;</p><div class="alert alert-warning">Module reference is taken from the source code. <a href="https://github.com/Codeception/Codeception/tree/2.1/src/Codeception/Module/Lumen.php">Help us to improve documentation. Edit module reference</a></div>

@@ -34,7 +34,7 @@ class MongoDbTest extends \PHPUnit_Framework_TestCase
 
         $mongo = new \MongoClient();
         
-        $this->module = new MongoDb();
+        $this->module = new MongoDb(make_container());
         $this->module->_setConfig($this->mongoConfig);
         $this->module->_initialize();
 

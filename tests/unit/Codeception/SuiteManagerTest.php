@@ -1,6 +1,10 @@
 <?php
 if (!defined('PHPUNIT_TESTSUITE')) define('PHPUNIT_TESTSUITE', true);
 
+/**
+ * @group core
+ * Class SuiteManagerTest
+ */
 class SuiteManagerTest extends \PHPUnit_Framework_TestCase
 {
     /**
@@ -18,7 +22,8 @@ class SuiteManagerTest extends \PHPUnit_Framework_TestCase
      */
     protected $runner;
 
-    public function setUp() {
+    public function setUp()
+    {
         $this->dispatcher = new Symfony\Component\EventDispatcher\EventDispatcher;
         $settings = \Codeception\Configuration::$defaultSuiteSettings;
         $settings['class_name'] = 'CodeGuy';
@@ -46,6 +51,7 @@ class SuiteManagerTest extends \PHPUnit_Framework_TestCase
      */
     public function testFewTests() {
         $file = \Codeception\Configuration::dataDir().'SimpleCest.php';
+
         $this->suiteman->loadTests($file);
         $this->assertEquals(2, $this->suiteman->getSuite()->count());
 
@@ -70,6 +76,12 @@ class SuiteManagerTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(3, $newSuiteMan->getSuite()->count());
     }
 
+    public function testDependencyResolution()
+    {
+        $this->suiteman->loadTests(codecept_data_dir().'SimpleWithDependencyInjectionCest.php');
+        $this->assertEquals(3, $this->suiteman->getSuite()->count());
+    }
+
     public function testGroupEventsAreFired()
     {
         $events = [];
@@ -80,10 +92,16 @@ class SuiteManagerTest extends \PHPUnit_Framework_TestCase
         $this->dispatcher->addListener('test.after.admin', $eventListener);
 
         $this->suiteman->loadTests(codecept_data_dir().'SimpleAdminGroupCest.php');
-        $this->suiteman->run($this->runner, new \PHPUnit_Framework_TestResult, ['silent' => true, 'colors' => false, 'steps' => true, 'debug' => false]);
+        $result = new \PHPUnit_Framework_TestResult;
+        $listener = new \Codeception\PHPUnit\Listener($this->dispatcher);
+        $result->addListener($listener);
+        $this->suiteman->run($this->runner, $result, ['silent' => true, 'colors' => false, 'steps' => true, 'debug' => false]);
         $this->assertContains('test.before', $events);
         $this->assertContains('test.before.admin', $events);
+        $this->assertContains('test.after', $events);
         $this->assertContains('test.after.admin', $events);
     }
+
+
 
 }

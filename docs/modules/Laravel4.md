@@ -1,6 +1,4 @@
-# Laravel4 Module
 
-**For additional reference, please review the [source](https://github.com/Codeception/Codeception/tree/2.0/src/Codeception/Module/Laravel4.php)**
 
 
 
@@ -11,6 +9,12 @@ The original author of this module is Davert.
 ## Demo Project
 
 <https://github.com/Codeception/sample-l4-app>
+
+## Example
+
+    modules:
+        enabled:
+            - Laravel4
 
 ## Status
 
@@ -32,6 +36,106 @@ The original author of this module is Davert.
 * app - `Illuminate\Foundation\Application` instance
 * client - `BrowserKit` client
 
+## Parts
+
+* ORM - include only haveRecord/grabRecord/seeRecord/dontSeeRecord actions
+
+
+
+### _findElements
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Locates element using available Codeception locator types:
+
+* XPath
+* CSS
+* Strict Locator
+
+Use it in Helpers or GroupObject or Extension classes:
+
+```php
+<?php
+$els = $this->getModule('Laravel4')->_findElements('.items');
+$els = $this->getModule('Laravel4')->_findElements(['name' => 'username']);
+
+$editLinks = $this->getModule('Laravel4')->_findElements(['link' => 'Edit']);
+// now you can iterate over $editLinks and check that all them have valid hrefs
+```
+
+WebDriver module returns `Facebook\WebDriver\Remote\RemoteWebElement` instances
+PhpBrowser and Framework modules return `Symfony\Component\DomCrawler\Crawler` instances
+
+ * `param` $locator
+ * `return` array of interactive elements
+
+
+### _loadPage
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Opens a page with arbitrary request parameters.
+Useful for testing multi-step forms on a specific step.
+
+```php
+<?php
+// in Helper class
+public function openCheckoutFormStep2($orderId) {
+    $this->getModule('Laravel4')->_loadPage('POST', '/checkout/step2', ['order' => $orderId]);
+}
+?>
+```
+
+ * `param` $method
+ * `param` $uri
+ * `param array` $parameters
+ * `param array` $files
+ * `param array` $server
+ * `param null` $content
+
+
+### _request
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Send custom request to a backend using method, uri, parameters, etc.
+Use it in Helpers to create special request actions, like accessing API
+Returns a string with response body.
+
+```php
+<?php
+// in Helper class
+public function createUserByApi($name) {
+    $userData = $this->getModule('Laravel4')->_request('POST', '/api/v1/users', ['name' => $name]);
+    $user = json_decode($userData);
+    return $user->id;
+}
+?>
+```
+Does not load the response into the module so you can't interact with response page (click, fill forms).
+To load arbitrary page for interaction, use `_loadPage` method.
+
+ * `param` $method
+ * `param` $uri
+ * `param array` $parameters
+ * `param array` $files
+ * `param array` $server
+ * `param null` $content
+@return mixed|Crawler
+@throws ExternalUrlException
+@see `_loadPage`
+
+
+### _savePageSource
+
+*hidden API method, expected to be used from Helper classes*
+ 
+Saves page source of to a file
+
+```php
+$this->getModule('Laravel4')->_savePageSource(codecept_output_dir().'page.html');
+```
+ * `param` $filename
 
 
 ### amHttpAuthenticated
@@ -50,6 +154,7 @@ Takes either `UserInterface` instance or array of credentials.
  * `param`  \Illuminate\Auth\UserInterface|array $user
  * `param`  string $driver
 @return void
+* Part: ** framework**
 
 
 ### amOnAction
@@ -118,7 +223,7 @@ Calls an Artisan command and returns output as a string
  * `param string` $command       The name of the command as displayed in the artisan command list
  * `param array`  $parameters    An associative array of command arguments
 
-@return string
+ * `return` string
 
 
 ### checkOption
@@ -138,7 +243,7 @@ $I->checkOption('#agree');
  
 Make sure the Laravel start file exists.
 
- ModuleConfig
+
 
 
 ### click
@@ -394,6 +499,8 @@ $I->dontSeeRecord('users', array('name' => 'davert'));
 
  * `param` $tableName
  * `param array` $attributes
+@part orm
+* Part: ** framework**
 
 
 ### fillField
@@ -415,7 +522,7 @@ $I->fillField(['name' => 'email'], 'jon@mail.com');
  
 Provides access the Laravel application object.
 
-@return \Illuminate\Foundation\Application
+ * `return` \Illuminate\Foundation\Application
 
 
 ### grabAttributeFrom
@@ -462,6 +569,32 @@ $uri = $I->grabFromCurrentUrl();
  * `internal param` $url
 
 
+### grabMultiple
+ 
+Grabs either the text content, or attribute values, of nodes
+matched by $cssOrXpath and returns them as an array.
+
+```html
+<a href="#first">First</a>
+<a href="#second">Second</a>
+<a href="#third">Third</a>
+```
+
+```php
+<?php
+// would return ['First', 'Second', 'Third']
+$aLinkText = $I->grabMultiple('a');
+
+// would return ['#first', '#second', '#third']
+$aLinks = $I->grabMultiple('a', 'href');
+?>
+```
+
+ * `param` $cssOrXpath
+ * `param` $attribute
+ * `return` string[]
+
+
 ### grabRecord
  
 Retrieves record from database
@@ -474,6 +607,8 @@ $category = $I->grabRecord('users', array('name' => 'davert'));
 
  * `param` $tableName
  * `param array` $attributes
+@part ORM
+* Part: ** framework**
 
 
 ### grabService
@@ -498,6 +633,7 @@ $service = $I->grabService('foo');
 ```
 
  * `param`  string $class
+* Part: ** framework**
 
 
 ### grabTextFrom
@@ -521,7 +657,7 @@ $value = $I->grabTextFrom('~<input value=(.*?)]~sgi'); // match with a regex
  
  * `param` $field
 
-@return array|mixed|null|string
+ * `return` array|mixed|null|string
 
 
 ### haveDisabledFilters
@@ -546,11 +682,14 @@ $user_id = $I->haveRecord('users', array('name' => 'Davert'));
 
  * `param` $tableName
  * `param array` $attributes
+@part orm
+* Part: ** framework**
 
 
 ### logout
  
 Logs user out
+* Part: ** framework**
 
 
 ### resetCookie
@@ -583,6 +722,7 @@ $I->see('Sign Up','//body/h1'); // with XPath
 ### seeAuthentication
  
 Checks that user is authenticated
+* Part: ** framework**
 
 
 ### seeCheckboxIsChecked
@@ -740,7 +880,7 @@ $I->seeFormHasErrors();
 ?>
 ```
 
-@return bool
+ * `return` bool
 
 
 ### seeInCurrentUrl
@@ -761,7 +901,7 @@ $I->seeInCurrentUrl('/users/');
 
 ### seeInField
  
-Checks that the given input field or textarea contains the given value. 
+Checks that the given input field or textarea contains the given value.
 For fuzzy locators, fields are matched by label text, the "name" attribute, CSS, and XPath.
 
 ``` php
@@ -855,7 +995,7 @@ $I->seeInSession('key', 'value');
 
  * `param`  string|array $key
  * `param`  mixed $value
-@return void
+ * `return` void
 
 
 ### seeInTitle
@@ -899,9 +1039,9 @@ $I->seeNumberOfElements('tr', [0,10]); //between 0 and 10 elements
 ?>
 ```
  * `param` $selector
- * `param mixed` $expected:
+ * `param mixed` $expected :
 - string: strict number
-- array: range of numbers [0,10]  
+- array: range of numbers [0,10]
 
 
 ### seeOptionIsSelected
@@ -936,6 +1076,8 @@ $I->seeRecord('users', array('name' => 'davert'));
 
  * `param` $tableName
  * `param array` $attributes
+@part orm
+* Part: ** framework**
 
 
 ### seeResponseCodeIs
@@ -992,7 +1134,7 @@ $I->seeSessionHasValues(['key1' => 'value1', 'key2' => 'value2']);
 ```
 
  * `param`  array $bindings
-@return void
+ * `return` void
 
 
 ### selectOption
@@ -1091,8 +1233,6 @@ $I->setCookie('PHPSESSID', 'el4ukv0kqbvoirg7nkp4dncpk3');
  * `param` $name
  * `param` $val
  * `param array` $params
- * `internal param` $cookie
- * `internal param` $value
 
 
 
@@ -1134,7 +1274,7 @@ For example, given this sample "Sign Up" form:
     <input type="text" name="user[login]" /><br/>
     Password:
     <input type="password" name="user[password]" /><br/>
-    Do you agree to out terms?
+    Do you agree to our terms?
     <input type="checkbox" name="user[agree]" /><br/>
     Select pricing plan:
     <select name="plan">
@@ -1254,6 +1394,24 @@ $I->submitForm('#my-form', [
  * `param` $button
 
 
+### switchToIframe
+ 
+Switch to iframe or frame on the page.
+
+Example:
+``` html
+<iframe name="another_frame" src="http://example.com">
+```
+
+``` php
+<?php
+# switch to iframe
+$I->switchToIframe("another_frame");
+```
+
+ * `param string` $name
+
+
 ### uncheckOption
  
 Unticks a checkbox.
@@ -1266,4 +1424,4 @@ $I->uncheckOption('#notify');
 
  * `param` $option
 
-<p>&nbsp;</p><div class="alert alert-warning">Module reference is taken from the source code. <a href="https://github.com/Codeception/Codeception/tree/2.0/src/Codeception/Module/Laravel4.php">Help us to improve documentation. Edit module reference</a></div>
+<p>&nbsp;</p><div class="alert alert-warning">Module reference is taken from the source code. <a href="https://github.com/Codeception/Codeception/tree/2.1/src/Codeception/Module/Laravel4.php">Help us to improve documentation. Edit module reference</a></div>

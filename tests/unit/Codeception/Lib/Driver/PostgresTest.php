@@ -9,11 +9,11 @@ class PostgresTest extends \PHPUnit_Framework_TestCase
     protected static $config = [
         'dsn' => 'pgsql:host=localhost;dbname=codeception_test',
         'user' => 'postgres',
-        'password' => ''
+        'password' => null,
     ];
 
-    protected static $postgres;
     protected static $sql;
+    protected $postgres;
     
     public static function setUpBeforeClass()
     {
@@ -27,8 +27,8 @@ class PostgresTest extends \PHPUnit_Framework_TestCase
         $sql = preg_replace('%/\*(?:(?!\*/).)*\*/%s', "", $sql);
         self::$sql = explode("\n", $sql);
         try {
-            self::$postgres = Db::create(self::$config['dsn'], self::$config['user'], self::$config['password']);
-            self::$postgres->cleanup();
+            $postgres = Db::create(self::$config['dsn'], self::$config['user'], self::$config['password']);
+            $postgres->cleanup();
         } catch (\Exception $e) {
         }
         
@@ -36,52 +36,82 @@ class PostgresTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        if (!isset(self::$postgres)) {
-            if (!function_exists('pg_connect')) {
-                $this->markTestSkipped("Postgres extension is not loaded");
-            } else {
-                $this->markTestSkipped('Coudn\'t establish connection to database');
-            }
+        try {
+            $this->postgres = Db::create(self::$config['dsn'], self::$config['user'], self::$config['password']);
+        } catch (\Exception $e) {
+            $this->markTestSkipped('Coudn\'t establish connection to database');
         }
-        self::$postgres->load(self::$sql);
+        $this->postgres->load(self::$sql);
     }
     
     public function tearDown()
     {
-        if (isset(self::$postgres)) {
-            self::$postgres->cleanup();
+        if (isset($this->postgres)) {
+            $this->postgres->cleanup();
         }
     }
 
 
     public function testCleanupDatabase()
     {
-        $this->assertNotEmpty(self::$postgres->getDbh()->query("SELECT * FROM pg_tables where schemaname = 'public'")->fetchAll());
-        self::$postgres->cleanup();
-        $this->assertEmpty(self::$postgres->getDbh()->query("SELECT * FROM pg_tables where schemaname = 'public'")->fetchAll());
+        $this->assertNotEmpty($this->postgres->getDbh()->query("SELECT * FROM pg_tables where schemaname = 'public'")->fetchAll());
+        $this->postgres->cleanup();
+        $this->assertEmpty($this->postgres->getDbh()->query("SELECT * FROM pg_tables where schemaname = 'public'")->fetchAll());
     }
 
     public function testLoadDump()
     {
-        $res = self::$postgres->getDbh()->query("select * from users where name = 'davert'");
+        $res = $this->postgres->getDbh()->query("select * from users where name = 'davert'");
         $this->assertNotEquals(false, $res);
         $this->assertGreaterThan(0, $res->rowCount());
 
-        $res = self::$postgres->getDbh()->query("select * from groups where name = 'coders'");
+        $res = $this->postgres->getDbh()->query("select * from groups where name = 'coders'");
         $this->assertNotEquals(false, $res);
         $this->assertGreaterThan(0, $res->rowCount());
 
-        $res = self::$postgres->getDbh()->query("select * from users where email = 'user2@example.org'");
+        $res = $this->postgres->getDbh()->query("select * from users where email = 'user2@example.org'");
         $this->assertNotEquals(false, $res);
         $this->assertGreaterThan(0, $res->rowCount());
+
+        $res = $this->postgres->getDbh()->query("select * from anotherschema.users where email = 'schemauser@example.org'");
+        $this->assertEquals(1, $res->rowCount());
     }
 
     public function testSelectWithEmptyCriteria()
     {
       $emptyCriteria = [];
-      $generatedSql = self::$postgres->select('test_column', 'test_table', $emptyCriteria);
+      $generatedSql = $this->postgres->select('test_column', 'test_table', $emptyCriteria);
 
       $this->assertNotContains('where', $generatedSql);
+    }
+
+    public function testGetSingleColumnPrimaryKey()
+    {
+        $this->assertEquals(['id'], $this->postgres->getPrimaryKey('order'));
+    }
+
+    public function testGetCompositePrimaryKey()
+    {
+        $this->assertEquals(['group_id', 'id'], $this->postgres->getPrimaryKey('composite_pk'));
+    }
+
+    public function testGetEmptyArrayIfTableHasNoPrimaryKey()
+    {
+        $this->assertEquals([], $this->postgres->getPrimaryKey('no_pk'));
+    }
+
+    public function testGetPrimaryColumnOfTableUsingReservedWordAsTableName()
+    {
+        $this->assertEquals('id', $this->postgres->getPrimaryColumn('order'));
+    }
+
+    /**
+     * @expectedException \Exception
+     * @expectedExceptionMessage getPrimaryColumn method does not support composite primary keys, use getPrimaryKey instead
+     */
+    public function testGetPrimaryColumnThrowsExceptionIfTableHasCompositePrimaryKey()
+    {
+        $this->postgres->getPrimaryColumn('composite_pk');
     }
 
 }

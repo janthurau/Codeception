@@ -1,20 +1,27 @@
 <?php
-
 namespace Codeception\TestCase;
 
-use Codeception\Events;
+use Codeception\TestCase as CodeceptionTestCase;
 use Codeception\Event\TestEvent;
+use Codeception\Events;
 use Codeception\Util\Annotation;
+use Codeception\TestCase\Interfaces\ScenarioDriven;
+use Codeception\TestCase\Interfaces\Descriptive;
+use Codeception\TestCase\Interfaces\Reported;
+use Codeception\TestCase\Interfaces\Configurable;
+use Codeception\TestCase\Shared\Actor;
+use Codeception\TestCase\Shared\Dependencies;
+use Codeception\TestCase\Shared\ScenarioPrint;
 
-class Cest extends \Codeception\TestCase implements
-    Interfaces\ScenarioDriven,
-    Interfaces\Descriptive,
-    Interfaces\Reported,
-    Interfaces\Configurable
+class Cest extends CodeceptionTestCase implements
+    ScenarioDriven,
+    Descriptive,
+    Reported,
+    Configurable
 {
-    use Shared\Actor;
-    use Shared\Dependencies;
-    use Shared\ScenarioPrint;
+    use Actor;
+    use Dependencies;
+    use ScenarioPrint;
 
     protected $testClassInstance = null;
     protected $testMethod = null;
@@ -24,7 +31,7 @@ class Cest extends \Codeception\TestCase implements
         parent::__construct('testCodecept', $data, $dataName);
     }
 
-    public function getName($withDataSet = TRUE)
+    public function getName($withDataSet = true)
     {
         return $this->testMethod;
     }
@@ -33,10 +40,9 @@ class Cest extends \Codeception\TestCase implements
     {
         $this->scenario->setFeature($this->getSpecFromMethod());
         $code = $this->getRawBody();
-        $params = (new \ReflectionMethod($this->testClassInstance, $this->testMethod))->getParameters();
-        $scenarioVar = isset($params[1]) ? $params[1]->getName() : null;
         $this->parser->parseFeature($code);
-        $this->parser->parseScenarioOptions($code, $scenarioVar);
+        $this->parser->attachMetadata(Annotation::forMethod($this->testClassInstance, $this->testMethod)->raw());
+        $this->di->injectDependencies($this->testClassInstance);
         $this->fire(Events::TEST_PARSED, new TestEvent($this));
     }
 
@@ -51,24 +57,20 @@ class Cest extends \Codeception\TestCase implements
 
     public function testCodecept()
     {
-        $this->fire(Events::TEST_BEFORE, new TestEvent($this));
-
-        $this->scenario->run();
         $I = $this->makeIObject();
 
+        $this->prepareActorForTest();
         try {
-            $this->executeBefore($I);
+            $this->executeHook($I, 'before');
             $this->executeBeforeMethods($this->testMethod, $I);
             $this->executeTestMethod($I);
             $this->executeAfterMethods($this->testMethod, $I);
-            $this->executeAfter($I);
+            $this->executeHook($I, 'after');
         } catch (\Exception $e) {
-            $this->executeFailed($I);
+            $this->executeHook($I, 'failed');
             // fails and errors are now handled by Codeception\PHPUnit\Listener
             throw $e;
         }
-
-        $this->fire(Events::TEST_AFTER, new TestEvent($this));
     }
 
     protected function executeBeforeMethods($testMethod, $I)
@@ -95,15 +97,13 @@ class Cest extends \Codeception\TestCase implements
     {
         if (method_exists($this->testClassInstance, $context)) {
             $this->executeBeforeMethods($context, $I);
-            $contextMethod = new \ReflectionMethod($this->testClassInstance, $context);
-            $contextMethod->setAccessible(true);
-            $contextMethod->invoke($this->testClassInstance, $I, $this->getScenario());
+            $this->invoke($context, [$I, $this->scenario]);
             $this->executeAfterMethods($context, $I);
             return;
         }
 
         throw new \LogicException(
-            "Method $context defined in annotation but does not exists in " . get_class($this->testClassInstance)
+            "Method $context defined in annotation but does not exist in " . get_class($this->testClassInstance)
         );
     }
 
@@ -119,13 +119,21 @@ class Cest extends \Codeception\TestCase implements
         return $I;
     }
 
+    protected function invoke($methodName, array $context)
+    {
+        foreach ($context as $class) {
+            $this->di->set($class);
+        }
+        $this->di->injectDependencies($this->testClassInstance, $methodName, $context);
+    }
+
     protected function executeTestMethod($I)
     {
         $testMethodSignature = [$this->testClassInstance, $this->testMethod];
         if (! is_callable($testMethodSignature)) {
             throw new \Exception("Method {$this->testMethod} can't be found in tested class");
         }
-        call_user_func($testMethodSignature, $I, $this->scenario);
+        $this->invoke($this->testMethod, [$I, $this->scenario]);
     }
 
     public function getTestClass()
@@ -164,12 +172,6 @@ class Cest extends \Codeception\TestCase implements
         return $this;
     }
 
-    public function configEnv($env)
-    {
-        $this->testClassInstance->env = $env;
-        return $this;
-    }
-
     public function getSignature()
     {
         return get_class($this->getTestClass()) . "::" . $this->getTestMethod();
@@ -182,49 +184,31 @@ class Cest extends \Codeception\TestCase implements
 
     public function toString()
     {
-        return $this->getFeature(). " (".$this->getSignature().")";
+        return $this->getFeature() . " (" . $this->getSignature() . ")";
     }
-    
+
+    public function getEnvironment()
+    {
+        return Annotation::forMethod($this->testClassInstance, $this->testMethod)->fetchAll('env');
+    }
+
     /**
      * @return array
      */
     public function getReportFields()
     {
         return [
-            'file' => $this->getFileName(),
-            'name' => $this->getTestMethod(),
-            'class' => get_class($this->getTestClass()),
+            'file'    => $this->getFileName(),
+            'name'    => $this->getTestMethod(),
+            'class'   => get_class($this->getTestClass()),
             'feature' => $this->getFeature()
         ];
     }
 
-    /**
-     * @param $I
-     */
-    protected function executeBefore($I)
+    protected function executeHook($I, $hook)
     {
-        if (is_callable([$this->testClassInstance, '_before'])) {
-            $this->testClassInstance->_before($I);
-        }
-    }
-
-    /**
-     * @param $I
-     */
-    protected function executeAfter($I)
-    {
-        if (is_callable([$this->testClassInstance, '_after'])) {
-            $this->testClassInstance->_after($I);
-        }
-    }
-
-    /**
-     * @param $I
-     */
-    protected function executeFailed($I)
-    {
-        if (is_callable([$this->testClassInstance, '_failed'])) {
-            $this->testClassInstance->_failed($I);
+        if (is_callable([$this->testClassInstance, "_$hook"])) {
+            $this->invoke("_$hook", [$I, $this->scenario]);
         }
     }
 

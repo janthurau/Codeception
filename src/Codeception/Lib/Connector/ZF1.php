@@ -1,10 +1,10 @@
 <?php
 namespace Codeception\Lib\Connector;
 
+use GuzzleHttp\Psr7\Uri;
 use Symfony\Component\BrowserKit\Client;
 use Symfony\Component\BrowserKit\Response;
 use Symfony\Component\BrowserKit\Request as BrowserKitRequest;
-use GuzzleHttp\Url;
 
 class ZF1 extends Client
 {
@@ -45,7 +45,7 @@ class ZF1 extends Client
         $redirector->setExit(false);
 
         // json helper should not exit
-        $json               = \Zend_Controller_Action_HelperBroker::getStaticHelper('json');
+        $json = \Zend_Controller_Action_HelperBroker::getStaticHelper('json');
         $json->suppressExit = true;
 
         $zendRequest = new \Zend_Controller_Request_HttpTestCase();
@@ -68,8 +68,10 @@ class ZF1 extends Client
         ob_start();
         try {
             $this->bootstrap->run();
+            $_GET = $_POST = [];
         } catch (\Exception $e) {
             ob_end_clean();
+            $_GET = $_POST = [];
             throw $e;
         }
         ob_end_clean();
@@ -107,7 +109,6 @@ class ZF1 extends Client
     }
 
 
-
     /**
      * @return \Zend_Controller_Request_HttpTestCase
      */
@@ -118,9 +119,9 @@ class ZF1 extends Client
 
     private function extractHeaders(BrowserKitRequest $request)
     {
-        $headers = array();
+        $headers = [];
         $server = $request->getServer();
-        $uri                 = Url::fromString($request->getUri());
+        $uri                 = new Uri($request->getUri());
         $server['HTTP_HOST'] = $uri->getHost();
         $port                = $uri->getPort();
         if ($port !== null && $port !== 443 && $port != 80) {

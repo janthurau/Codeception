@@ -1,5 +1,4 @@
 <?php
-
 namespace Codeception\Lib\Interfaces;
 
 interface Web
@@ -53,6 +52,34 @@ interface Web
      * @param null $selector
      */
     public function dontSee($text, $selector = null);
+    
+    /**
+     * Checks that the current page contains the given string in its
+     * raw source code.
+     *
+     * ``` php
+     * <?php
+     * $I->seeInSource('<h1>Green eggs &amp; ham</h1>');
+     * ?>
+     * ```
+     *
+     * @param      $raw
+     */
+    public function seeInSource($raw);
+
+    /**
+     * Checks that the current page contains the given string in its
+     * raw source code.
+     *
+     * ```php
+     * <?php
+     * $I->dontSeeInSource('<h1>Green eggs &amp; ham</h1>');
+     * ?>
+     * ```
+     *
+     * @param      $raw
+     */
+    public function dontSeeInSource($raw);
 
     /**
      * Submits the given form on the page, optionally with the given form
@@ -66,7 +93,7 @@ interface Web
      * in the request with the last parameter as an alternative to
      * explicitly setting its value in the second parameter, as
      * button values are not otherwise included in the request.
-     * 
+     *
      * Examples:
      *
      * ``` php
@@ -91,7 +118,7 @@ interface Web
      *     <input type="text" name="user[login]" /><br/>
      *     Password:
      *     <input type="password" name="user[password]" /><br/>
-     *     Do you agree to out terms?
+     *     Do you agree to our terms?
      *     <input type="checkbox" name="user[agree]" /><br/>
      *     Select pricing plan:
      *     <select name="plan">
@@ -412,7 +439,7 @@ interface Web
     public function dontSeeCheckboxIsChecked($checkbox);
 
     /**
-     * Checks that the given input field or textarea contains the given value. 
+     * Checks that the given input field or textarea contains the given value.
      * For fuzzy locators, fields are matched by label text, the "name" attribute, CSS, and XPath.
      *
      * ``` php
@@ -692,6 +719,32 @@ interface Web
      * @return mixed
      */
     public function grabAttributeFrom($cssOrXpath, $attribute);
+    
+    /**
+     * Grabs either the text content, or attribute values, of nodes
+     * matched by $cssOrXpath and returns them as an array.
+     * 
+     * ```html
+     * <a href="#first">First</a>
+     * <a href="#second">Second</a>
+     * <a href="#third">Third</a>
+     * ```
+     * 
+     * ```php
+     * <?php
+     * // would return ['First', 'Second', 'Third']
+     * $aLinkText = $I->grabMultiple('a');
+     * 
+     * // would return ['#first', '#second', '#third']
+     * $aLinks = $I->grabMultiple('a', 'href');
+     * ?>
+     * ```
+     * 
+     * @param $cssOrXpath
+     * @param $attribute
+     * @return string[]
+     */
+    public function grabMultiple($cssOrXpath, $attribute = null);
 
     /**
      * Checks that the given element exists on the page and is visible.
@@ -713,7 +766,7 @@ interface Web
      * @param array $attributes
      * @return
      */
-    public function seeElement($selector, $attributes = array());
+    public function seeElement($selector, $attributes = []);
 
     /**
      * Checks that the given element is invisible or not present on the page.
@@ -731,11 +784,11 @@ interface Web
      * @param $selector
      * @param array $attributes
      */
-    public function dontSeeElement($selector, $attributes = array());
+    public function dontSeeElement($selector, $attributes = []);
 
-   /**
+    /**
      * Checks that there are a certain number of elements matched by the given locator on the page.
-     * 
+     *
      * ``` php
      * <?php
      * $I->seeNumberOfElements('tr', 10);
@@ -743,12 +796,12 @@ interface Web
      * ?>
      * ```
      * @param $selector
-     * @param mixed $expected:
+     * @param mixed $expected :
      * - string: strict number
-     * - array: range of numbers [0,10]  
+     * - array: range of numbers [0,10]
      */
-    public function seeNumberOfElements($selector, $expected);    
-    
+    public function seeNumberOfElements($selector, $expected);
+
     /**
      * Checks that the given option is selected.
      *
@@ -845,8 +898,6 @@ interface Web
      * @param $name
      * @param $val
      * @param array $params
-     * @internal param $cookie
-     * @internal param $value
      *
      * @return mixed
      */
